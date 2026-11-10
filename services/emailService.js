@@ -39,6 +39,9 @@ export const createTransporter = () => {
           user,
           pass,
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 4000,
+        socketTimeout: 10000,
       });
     }
 
@@ -51,6 +54,9 @@ export const createTransporter = () => {
         user,
         pass,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 4000,
+      socketTimeout: 10000,
       tls: {
         rejectUnauthorized: true,
       },

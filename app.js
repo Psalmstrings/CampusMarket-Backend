@@ -46,9 +46,15 @@ app.use((req, res, next) => {
 // Configure CORS for local dev and production
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Production origins only include configured client domain(s)
+// Production origins include configured client domain, www variant, and known deploy domains
 const prodOrigins = [
   process.env.CLIENT_URL,
+  ...(process.env.CLIENT_URL ? [
+    process.env.CLIENT_URL.replace('://', '://www.'),
+    process.env.CLIENT_URL.replace('://www.', '://'),
+  ] : []),
+  'https://campusmarket.ng',
+  'https://www.campusmarket.ng',
   ...(process.env.ADDITIONAL_ORIGINS ? process.env.ADDITIONAL_ORIGINS.split(',') : []),
 ].filter(Boolean);
 
@@ -71,6 +77,12 @@ app.use(
       }
 
       if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow preview and staging deployments on Render and Vercel
+      const isAllowedDeployPlatform = /^https:\/\/[a-z0-9-_]+\.(onrender\.com|vercel\.app)$/i.test(origin);
+      if (isAllowedDeployPlatform) {
         return callback(null, true);
       }
 

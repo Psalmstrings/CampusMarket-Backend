@@ -88,8 +88,10 @@ export const registerUser = async (req, res) => {
     const verificationToken = user.createEmailVerificationToken();
     await user.save();
 
-    // Dispatch verification email through configured service
-    await sendVerificationEmail(user, verificationToken);
+    // Dispatch verification email asynchronously - does not block HTTP response
+    sendVerificationEmail(user, verificationToken).catch((err) => {
+      console.error('Async verification email dispatch error:', err?.message);
+    });
 
     const populatedUser = await User.findById(user._id)
       .select('-password')
@@ -228,7 +230,10 @@ export const resendVerification = async (req, res) => {
     user.lastVerificationEmailSent = new Date();
     await user.save();
 
-    await sendVerificationEmail(user, verificationToken);
+    // Dispatch verification email asynchronously - does not block HTTP response
+    sendVerificationEmail(user, verificationToken).catch((err) => {
+      console.error('Async resend verification email dispatch error:', err?.message);
+    });
 
     // Note: Raw token is NEVER returned in response
     return res.json({
@@ -271,7 +276,10 @@ export const forgotPassword = async (req, res) => {
     const resetToken = user.createPasswordResetToken();
     await user.save();
 
-    await sendPasswordResetEmail(user, resetToken);
+    // Dispatch reset email asynchronously - does not block HTTP response
+    sendPasswordResetEmail(user, resetToken).catch((err) => {
+      console.error('Async password reset email dispatch error:', err?.message);
+    });
 
     // Note: Raw reset token is NEVER exposed in API response
     return res.json({
@@ -582,8 +590,10 @@ export const changePassword = async (req, res) => {
     user.passwordChangedAt = new Date();
     await user.save();
 
-    // Send security notification to user about password change
-    await sendPasswordChangeNotification(user);
+    // Send security notification asynchronously
+    sendPasswordChangeNotification(user).catch((err) => {
+      console.error('Async password change notification error:', err?.message);
+    });
 
     return res.json({
       success: true,

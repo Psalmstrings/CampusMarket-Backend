@@ -3,6 +3,7 @@ import Listing from '../models/Listing.js';
 import Campus from '../models/Campus.js';
 import Category from '../models/Category.js';
 import Report from '../models/Report.js';
+import { escapeRegex } from '../middleware/securityMiddleware.js';
 
 // @desc    Get comprehensive admin dashboard statistics
 // @route   GET /api/admin/stats
@@ -39,7 +40,7 @@ export const getAdminStats = async (req, res) => {
       { $group: { _id: '$campus', count: { $sum: 1 } } },
       {
         $lookup: {
-          from: 'campuses',
+          from: Campus.collection.name,
           localField: '_id',
           foreignField: '_id',
           as: 'campusInfo',
@@ -60,7 +61,7 @@ export const getAdminStats = async (req, res) => {
       { $group: { _id: '$category', count: { $sum: 1 } } },
       {
         $lookup: {
-          from: 'categories',
+          from: Category.collection.name,
           localField: '_id',
           foreignField: '_id',
           as: 'catInfo',
@@ -122,7 +123,8 @@ export const getAdminUsers = async (req, res) => {
     }
 
     if (search && search.trim() !== '') {
-      const regex = new RegExp(search.trim(), 'i');
+      const escaped = escapeRegex(search.trim());
+      const regex = new RegExp(escaped, 'i');
       query.$or = [{ firstName: regex }, { lastName: regex }, { email: regex }, { phone: regex }];
     }
 
@@ -208,7 +210,8 @@ export const getAdminListings = async (req, res) => {
     }
 
     if (search && search.trim() !== '') {
-      const regex = new RegExp(search.trim(), 'i');
+      const escaped = escapeRegex(search.trim());
+      const regex = new RegExp(escaped, 'i');
       query.$or = [{ title: regex }, { description: regex }, { location: regex }];
     }
 

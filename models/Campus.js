@@ -39,5 +39,5 @@ const campusSchema = new mongoose.Schema(
   }
 );
 
-const Campus = mongoose.model('Campus', campusSchema);
+const Campus = mongoose.model('Campus', campusSchema, 'campuses');
 export default Campus;

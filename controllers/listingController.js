@@ -2,6 +2,7 @@ import Listing from '../models/Listing.js';
 import Favorite from '../models/Favorite.js';
 import Category from '../models/Category.js';
 import Campus from '../models/Campus.js';
+import { escapeRegex } from '../middleware/securityMiddleware.js';
 
 // @desc    Get all listings with filtering, search, pagination, and sorting
 // @route   GET /api/listings
@@ -47,10 +48,11 @@ export const getListings = async (req, res) => {
       if (campus.match(/^[0-9a-fA-F]{24}$/)) {
         query.campus = campus;
       } else {
+        const escapedCampus = escapeRegex(campus);
         const campusObj = await Campus.findOne({
           $or: [
             { shortName: campus.toUpperCase() },
-            { name: new RegExp(campus, 'i') },
+            { name: new RegExp(escapedCampus, 'i') },
           ],
         });
         if (campusObj) {
@@ -85,7 +87,8 @@ export const getListings = async (req, res) => {
 
     // Search query across title, description, and location
     if (search && search.trim() !== '') {
-      const regex = new RegExp(search.trim(), 'i');
+      const escaped = escapeRegex(search.trim());
+      const regex = new RegExp(escaped, 'i');
       query.$or = [{ title: regex }, { description: regex }, { location: regex }];
     }
 
@@ -181,6 +184,15 @@ export const getListingById = async (req, res) => {
 // @access  Private (Student/Vendor/Admin)
 export const createListing = async (req, res) => {
   try {
+    // Unverified students cannot create listings until email is verified
+    if (req.user.role === 'student' && !req.user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Please verify your student email address before publishing listings.',
+      });
+    }
+
     const {
       title,
       description,
@@ -192,10 +204,18 @@ export const createListing = async (req, res) => {
       images,
     } = req.body;
 
-    if (!title || !description || !category || !campus || !price || !condition || !location) {
+    if (!title || !description || !category || !campus || price === undefined || !condition || !location) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields',
+      });
+    }
+
+    const parsedPrice = Number(price);
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Price must be a valid positive amount in Naira',
       });
     }
 
@@ -213,7 +233,7 @@ export const createListing = async (req, res) => {
       description: description.trim(),
       category,
       campus,
-      price: Number(price),
+      price: parsedPrice,
       condition,
       location: location.trim(),
       images,
@@ -274,7 +294,16 @@ export const updateListing = async (req, res) => {
     if (description) listing.description = description.trim();
     if (category) listing.category = category;
     if (campus) listing.campus = campus;
-    if (price !== undefined) listing.price = Number(price);
+    if (price !== undefined) {
+      const parsedPrice = Number(price);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Price must be a valid positive amount in Naira',
+        });
+      }
+      listing.price = parsedPrice;
+    }
     if (condition) listing.condition = condition;
     if (location) listing.location = location.trim();
     if (images && Array.isArray(images) && images.length > 0) listing.images = images;

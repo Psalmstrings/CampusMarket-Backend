@@ -77,6 +77,7 @@ export const autoSeedData = async () => {
       level: 'Staff',
       role: 'admin',
       isVerified: true,
+      mustChangePassword: true,
       profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
     });
 

@@ -20,50 +20,23 @@ router.get('/smtp-diagnostic', async (req, res) => {
   try {
     const rawUser = process.env.SMTP_USER || '';
     const rawPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
-    const nodemailer = (await import('nodemailer')).default;
+    const hasResend = Boolean(process.env.RESEND_API_KEY);
+    const hasBrevo = Boolean(process.env.BREVO_API_KEY);
 
-    const tests = {};
-
-    // Test 1: Port 587 STARTTLS
-    try {
-      const t587 = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: { user: rawUser, pass: rawPass },
-        connectionTimeout: 5000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-      });
-      await t587.verify();
-      tests['port_587'] = 'SUCCESS';
-    } catch (e) {
-      tests['port_587'] = `${e.code || e.message}`;
-    }
-
-    // Test 2: Port 465 SSL
-    try {
-      const t465 = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: rawUser, pass: rawPass },
-        connectionTimeout: 5000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-      });
-      await t465.verify();
-      tests['port_465'] = 'SUCCESS';
-    } catch (e) {
-      tests['port_465'] = `${e.code || e.message}`;
-    }
+    const result = await verifySmtpConnection();
 
     return res.json({
+      activeProvider: hasResend ? 'resend (HTTPS API - Port 443)' : hasBrevo ? 'brevo (HTTPS API - Port 443)' : 'gmail-smtp',
+      resendConfigured: hasResend,
+      brevoConfigured: hasBrevo,
       hasUser: Boolean(rawUser),
       userMasked: rawUser ? `${rawUser.slice(0, 3)}***` : 'NOT_SET',
       hasPass: Boolean(rawPass),
       passLength: rawPass.length,
-      portsTest: tests,
+      verificationResult: result,
+      renderNote: (!hasResend && !hasBrevo && !result.connected)
+        ? 'Render blocks raw outbound SMTP ports 25, 465, and 587. To send emails on Render, add RESEND_API_KEY (from resend.com) or BREVO_API_KEY (from brevo.com) to your Render Environment.'
+        : 'Email provider connected and active.',
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

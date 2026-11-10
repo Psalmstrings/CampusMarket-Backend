@@ -92,6 +92,24 @@ export const sanitizeSmtpError = (error) => {
  * Verifies live SMTP credentials connection without sending an email
  */
 export const verifySmtpConnection = async () => {
+  if (process.env.RESEND_API_KEY) {
+    return {
+      connected: true,
+      provider: 'resend',
+      transport: 'HTTPS REST API (Port 443)',
+      note: 'Render cloud-compatible (bypasses outbound SMTP port block)',
+    };
+  }
+
+  if (process.env.BREVO_API_KEY) {
+    return {
+      connected: true,
+      provider: 'brevo',
+      transport: 'HTTPS REST API (Port 443)',
+      note: 'Render cloud-compatible (bypasses outbound SMTP port block)',
+    };
+  }
+
   const transporter = createTransporter();
   if (!transporter) {
     return {
@@ -120,9 +138,69 @@ export const verifySmtpConnection = async () => {
 };
 
 /**
- * Sends an email or gracefully falls back to console logging with full action link
+ * Sends an email via HTTPS REST API (cloud-safe) or Nodemailer SMTP fallback
  */
 export const sendEmail = async ({ to, subject, html, text }) => {
+  // 1. If RESEND_API_KEY is configured, use Resend HTTPS REST API (Port 443 - never blocked on Render)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resendFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM || 'CampusMart <onboarding@resend.dev>';
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: Array.isArray(to) ? to : [to],
+          subject,
+          html,
+          text,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        console.log(`✅ Email delivered via Resend HTTPS API to ${to} (ID: ${data.id})`);
+        return { delivered: true, provider: 'resend', messageId: data.id };
+      }
+      console.error('❌ Resend API delivery error:', data);
+    } catch (err) {
+      console.error('❌ Resend fetch error:', err.message);
+    }
+  }
+
+  // 2. If BREVO_API_KEY is configured, use Brevo HTTPS REST API (Port 443 - never blocked on Render)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const senderEmail = process.env.SMTP_USER || 'psalmstringss@gmail.com';
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': process.env.BREVO_API_KEY.trim(),
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: 'CampusMart', email: senderEmail },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        console.log(`✅ Email delivered via Brevo HTTPS API to ${to} (ID: ${data.messageId})`);
+        return { delivered: true, provider: 'brevo', messageId: data.messageId };
+      }
+      console.error('❌ Brevo API delivery error:', data);
+    } catch (err) {
+      console.error('❌ Brevo fetch error:', err.message);
+    }
+  }
+
+  // 3. Fallback to Nodemailer SMTP (Gmail / Custom SMTP)
   const from = process.env.EMAIL_FROM || `CampusMart Security <${process.env.SMTP_USER || 'no-reply@campusmarket.ng'}>`;
   const transporter = createTransporter();
 

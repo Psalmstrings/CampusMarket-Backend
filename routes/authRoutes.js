@@ -19,16 +19,51 @@ const router = express.Router();
 router.get('/smtp-diagnostic', async (req, res) => {
   try {
     const rawUser = process.env.SMTP_USER || '';
-    const rawPass = process.env.SMTP_PASS || '';
-    const result = await verifySmtpConnection();
+    const rawPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
+    const nodemailer = (await import('nodemailer')).default;
+
+    const tests = {};
+
+    // Test 1: Port 587 STARTTLS
+    try {
+      const t587 = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: { user: rawUser, pass: rawPass },
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
+      });
+      await t587.verify();
+      tests['port_587'] = 'SUCCESS';
+    } catch (e) {
+      tests['port_587'] = `${e.code || e.message}`;
+    }
+
+    // Test 2: Port 465 SSL
+    try {
+      const t465 = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: rawUser, pass: rawPass },
+        connectionTimeout: 5000,
+        greetingTimeout: 3000,
+        socketTimeout: 5000,
+      });
+      await t465.verify();
+      tests['port_465'] = 'SUCCESS';
+    } catch (e) {
+      tests['port_465'] = `${e.code || e.message}`;
+    }
+
     return res.json({
       hasUser: Boolean(rawUser),
       userMasked: rawUser ? `${rawUser.slice(0, 3)}***` : 'NOT_SET',
       hasPass: Boolean(rawPass),
       passLength: rawPass.length,
-      smtpHost: process.env.SMTP_HOST || 'default: smtp.gmail.com',
-      smtpPort: process.env.SMTP_PORT || 'default: 587',
-      result,
+      portsTest: tests,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

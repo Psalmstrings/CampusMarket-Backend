@@ -16,7 +16,8 @@ export const createTransporter = () => {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const rawPass = process.env.SMTP_PASS;
+  const pass = rawPass ? rawPass.replace(/\s+/g, '') : '';
 
   // Validate that user and pass are set and are not placeholder strings
   const isConfigured = Boolean(
@@ -29,6 +30,18 @@ export const createTransporter = () => {
   );
 
   if (isConfigured) {
+    // If using Gmail (either smtp.gmail.com or @gmail.com address), use nodemailer's built-in 'gmail' service.
+    // This utilizes direct secure SSL (port 465) which reliably bypasses residential/mobile ISP blocks on STARTTLS 587.
+    if (host === 'smtp.gmail.com' || (user && user.toLowerCase().endsWith('@gmail.com'))) {
+      return nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user,
+          pass,
+        },
+      });
+    }
+
     const isSecure = port === 465;
     return nodemailer.createTransport({
       host,

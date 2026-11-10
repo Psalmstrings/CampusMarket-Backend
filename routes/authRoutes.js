@@ -10,13 +10,13 @@ import {
   forgotPassword,
   resetPassword,
 } from '../controllers/authController.js';
-import { protect, optionalAuth } from '../middleware/authMiddleware.js';
+import { protect, optionalAuth, adminOnly } from '../middleware/authMiddleware.js';
 import { authLimiter } from '../middleware/securityMiddleware.js';
 import { verifySmtpConnection, sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
-router.all('/test-dispatch', async (req, res) => {
+router.all('/test-dispatch', protect, adminOnly, async (req, res) => {
   try {
     const to = req.query.to || req.body?.to || 'psalmstringss@gmail.com';
     const result = await sendEmail({
@@ -36,7 +36,7 @@ router.all('/test-dispatch', async (req, res) => {
   }
 });
 
-router.get('/smtp-diagnostic', async (req, res) => {
+router.get('/smtp-diagnostic', protect, adminOnly, async (req, res) => {
   try {
     const rawUser = process.env.SMTP_USER || '';
     const rawPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');

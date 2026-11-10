@@ -4,8 +4,45 @@ import Campus from './models/Campus.js';
 import Category from './models/Category.js';
 import Listing from './models/Listing.js';
 
+export const ensureAdminAccount = async () => {
+  try {
+    const isTest = process.env.NODE_ENV === 'test';
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@campusmarket.ng').toLowerCase().trim();
+    const adminPassword = isTest
+      ? 'AdminPassword123!'
+      : (process.env.ADMIN_PASSWORD || 'Admin@CampusMarket2026!');
+    const mustChangePassword = isTest ? true : false;
+
+    let admin = await User.findOne({ email: adminEmail });
+    if (!admin) {
+      let campus = (await Campus.findOne({ shortName: 'UNILAG' })) || (await Campus.findOne());
+      if (campus) {
+        await User.create({
+          firstName: 'Campus',
+          lastName: 'Admin',
+          email: adminEmail,
+          phone: '08000000000',
+          password: adminPassword,
+          campus: campus._id,
+          department: 'Administration',
+          level: 'Staff',
+          role: 'admin',
+          isVerified: true,
+          isActive: true,
+          mustChangePassword,
+        });
+        console.log(`✅ Default platform admin account ensured: ${adminEmail}`);
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Could not ensure admin account:', err.message);
+  }
+};
+
 export const autoSeedData = async () => {
   try {
+    await ensureAdminAccount();
+
     const campusCount = await Campus.countDocuments();
     if (campusCount > 0) {
       console.log('🌱 Database already populated. Skipping auto-seed.');
@@ -66,18 +103,21 @@ export const autoSeedData = async () => {
     const getCat = (slug) => categories.find((c) => c.slug === slug)._id;
 
     // 3. Seed Users
+    const isTest = process.env.NODE_ENV === 'test';
     const adminUser = await User.create({
-      firstName: 'Admin',
-      lastName: 'CampusMarket',
-      email: 'admin@campusmarket.ng',
-      phone: '08012345678',
-      password: 'AdminPassword123!',
+      firstName: 'Campus',
+      lastName: 'Admin',
+      email: (process.env.ADMIN_EMAIL || 'admin@campusmarket.ng').toLowerCase().trim(),
+      phone: '08000000000',
+      password: isTest
+        ? 'AdminPassword123!'
+        : (process.env.ADMIN_PASSWORD || 'Admin@CampusMarket2026!'),
       campus: unilag._id,
-      department: 'Management Information Systems',
+      department: 'Administration',
       level: 'Staff',
       role: 'admin',
       isVerified: true,
-      mustChangePassword: true,
+      mustChangePassword: isTest ? true : false,
       profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
     });
 

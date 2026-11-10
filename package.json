@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node seed.js",
+    "init-admin": "node scripts/initAdmin.js",
     "test": "node test_comprehensive.js"
   },
   "dependencies": {

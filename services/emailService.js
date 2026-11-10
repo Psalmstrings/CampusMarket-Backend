@@ -144,7 +144,15 @@ export const sendEmail = async ({ to, subject, html, text }) => {
   // 1. If RESEND_API_KEY is configured, use Resend HTTPS REST API (Port 443 - never blocked on Render)
   if (process.env.RESEND_API_KEY) {
     try {
-      const resendFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM || 'CampusMart <onboarding@resend.dev>';
+      // Resend strictly forbids sending from public domains like @gmail.com or @yahoo.com.
+      // Use onboarding@resend.dev unless an explicit verified domain is configured via RESEND_FROM.
+      let resendFrom = 'CampusMart <onboarding@resend.dev>';
+      if (process.env.RESEND_FROM) {
+        resendFrom = process.env.RESEND_FROM;
+      } else if (process.env.EMAIL_FROM && !process.env.EMAIL_FROM.includes('@gmail.com') && !process.env.EMAIL_FROM.includes('@yahoo.com')) {
+        resendFrom = process.env.EMAIL_FROM;
+      }
+
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -165,8 +173,10 @@ export const sendEmail = async ({ to, subject, html, text }) => {
         return { delivered: true, provider: 'resend', messageId: data.id };
       }
       console.error('❌ Resend API delivery error:', data);
+      return { delivered: false, provider: 'resend', error: data.message || data };
     } catch (err) {
       console.error('❌ Resend fetch error:', err.message);
+      return { delivered: false, provider: 'resend', error: err.message };
     }
   }
 

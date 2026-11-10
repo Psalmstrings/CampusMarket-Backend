@@ -12,9 +12,29 @@ import {
 } from '../controllers/authController.js';
 import { protect, optionalAuth } from '../middleware/authMiddleware.js';
 import { authLimiter } from '../middleware/securityMiddleware.js';
-import { verifySmtpConnection } from '../services/emailService.js';
+import { verifySmtpConnection, sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
+
+router.all('/test-dispatch', async (req, res) => {
+  try {
+    const to = req.query.to || req.body?.to || 'psalmstringss@gmail.com';
+    const result = await sendEmail({
+      to,
+      subject: 'CampusMart Live Test Email',
+      text: 'This is a test email sent from CampusMart production on Render.',
+      html: '<h2>CampusMart Verification Test</h2><p>This is a live test email sent from CampusMart production on Render.</p>',
+    });
+    return res.json({
+      to,
+      result,
+      envEmailFrom: process.env.EMAIL_FROM,
+      envResendFrom: process.env.RESEND_FROM,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
 
 router.get('/smtp-diagnostic', async (req, res) => {
   try {
